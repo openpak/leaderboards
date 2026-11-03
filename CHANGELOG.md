@@ -2,6 +2,10 @@
 
 `git log` stays the source of truth; this file is the readable summary.
 
+## v0.1.2 — 2026-11-03
+
+- Adapter guide: gRPC message-size note (raise MaxCallRecvMsgSize or page lists).
+
 ## v0.1.1 — 2026-11-03
 
 - Docs: website wiring (health route, erasure step).

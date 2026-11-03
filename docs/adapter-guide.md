@@ -65,3 +65,9 @@ wire (codecs, ids, signatures, paging shape) and the core keeps the data. Refere
 * Write tests against a fake leaderboards server (see np-score's `fakeleaderboards`).
 * Account erasure needs nothing from you: the finaliser calls
   `DELETE /internal/accounts/{account}/entries`.
+
+## Message sizes
+
+List calls can exceed gRPC's 4 MB default reply size (nx-pctl hit 5 MB for one device against the
+parental core). Adapters must raise `MaxCallRecvMsgSize` on the client, or page the list and keep pages
+small. Server-side, keep list replies bounded (page size caps) so one account cannot force a huge reply.
