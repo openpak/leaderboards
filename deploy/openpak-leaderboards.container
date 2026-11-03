@@ -1,0 +1,18 @@
+# Sample only. Copy to ~/.config/containers/systemd/openpak-leaderboards.container, then
+# ~/openpak/deploy/pin-ips.sh --apply to pin its address.
+[Unit]
+Description=OpenPak leaderboards (neutral board store)
+Requires=openpak-postgres.service openpak-account.service
+After=openpak-postgres.service openpak-account.service
+[Container]
+ContainerName=openpak-leaderboards
+Image=ghcr.io/openpak/leaderboards:latest
+AutoUpdate=registry
+Network=openpak.network
+PublishPort=127.0.0.1:20210:20210
+EnvironmentFile=%h/openpak/deploy/.env
+Environment=LEADERBOARDS_HTTP_ADDR=:20210 LEADERBOARDS_GRPC_ADDR=:20211 LEADERBOARDS_METRICS_ADDR=:20212
+[Service]
+Restart=always
+[Install]
+WantedBy=default.target

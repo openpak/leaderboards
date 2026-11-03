@@ -1,0 +1,193 @@
+syntax = "proto3";
+
+package openpak.leaderboards.v1;
+
+option go_package = "github.com/openpak/leaderboards/proto/openpak/leaderboards/v1;leaderboardsv1";
+
+// The neutral leaderboards store. A board belongs to a title key that is the same on every
+// network (the title_keys table maps (network, native id) to it: a PS3 NPWR id, an Xbox 360
+// title id, a Switch application id). An entry is (account, board, sub) with a score, optional
+// per-column values, a comment, info and game data, and the network that wrote it. Accounts are
+// core account ids; adapters map their own ids (NpId, XUID, PID) to accounts before calling.
+//
+// Every request names the caller's network ("np", "x360", "wiiu", "switch", "wfc", "xbox") and
+// a title as that network knows it. Boards are cross-network by default; a board with
+// cross_network=false only ever sees entries written from the caller's network.
+service Leaderboards {
+  // Submit applies the board's aggregation to the account's entry and returns what is stored.
+  rpc Submit(SubmitRequest) returns (SubmitResponse);
+  // Range returns entries by position, 1-based start, in rank order.
+  rpc Range(RangeRequest) returns (RangeResponse);
+  // ByAccounts returns every entry (all subs) of the given accounts, best first.
+  rpc ByAccounts(ByAccountsRequest) returns (RangeResponse);
+  // FriendRanks returns the caller account's friends (and optionally the caller), the best entry
+  // per player, ranks global. The service asks the account core for the friend list.
+  rpc FriendRanks(FriendRanksRequest) returns (RangeResponse);
+  rpc BoardInfo(BoardInfoRequest) returns (BoardInfoResponse);
+  rpc Total(TotalRequest) returns (TotalResponse);
+  // SetData attaches game data to the entry whose score is exactly expect_score.
+  rpc SetData(SetDataRequest) returns (SetDataResponse);
+  rpc GetData(GetDataRequest) returns (GetDataResponse);
+  // Delete removes one account's entries on a board (all subs unless sub is set).
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  // Operator calls.
+  rpc UpsertBoard(UpsertBoardRequest) returns (BoardInfoResponse);
+  rpc MapTitle(MapTitleRequest) returns (MapTitleResponse);
+  rpc ResetBoard(ResetBoardRequest) returns (ResetBoardResponse);
+  rpc ListBoards(ListBoardsRequest) returns (ListBoardsResponse);
+}
+
+// Policy is a board's rules. Zero values mean "keep what is stored / use the default".
+message Policy {
+  string name        = 1;
+  string kind        = 2; // score | time | rating (display only)
+  string order       = 3; // desc (default) | asc
+  string aggregation = 4; // best (default) | latest | sum | force (alias of latest)
+  // Per-column aggregation (Xbox 360 stats): column id -> max | min | sum | latest.
+  map<string, string> column_aggregations = 5;
+  // When set, the entry's score is the merged value of this column (the rating column).
+  string score_column = 6;
+  string unit         = 7;
+  string season       = 8;
+  uint32 rank_limit   = 9;  // adapter-facing; the service never trims below it
+  uint32 data_limit   = 10; // adapter-facing: game-data slots per account
+  uint32 size_limit   = 11; // bytes of game data per entry (default 1 MiB)
+  // cross_network: tri-state so an update can leave it alone.
+  Tristate cross_network = 12;
+}
+
+enum Tristate {
+  TRISTATE_UNSPECIFIED = 0;
+  TRISTATE_TRUE        = 1;
+  TRISTATE_FALSE       = 2;
+}
+
+message Board {
+  string title = 1; // neutral title key
+  string id    = 2;
+  Policy policy = 3; // fully resolved: no defaults left implicit
+  bool   cross_network = 4;
+}
+
+message Entry {
+  string account      = 1;
+  int32  sub          = 2;
+  int64  score        = 3;
+  map<string, int64> columns = 4;
+  string comment      = 5;
+  bytes  info         = 6;
+  bool   has_data     = 7;
+  string network      = 8;
+  string display_name = 9;
+  int64  updated_unix_ms = 10;
+  int64  rank         = 11; // competition rank: ties share it
+  int64  position     = 12; // unique 1-based position
+}
+
+message BoardRef {
+  string network = 1; // the caller's network
+  string title   = 2; // the title as that network knows it (title_keys); a neutral key works with network ""
+  string board   = 3;
+}
+
+message SubmitRequest {
+  BoardRef ref   = 1;
+  string account = 2;
+  int32  sub     = 3;
+  int64  score   = 4;
+  map<string, int64> columns = 5;
+  string comment = 6;
+  bytes  info    = 7;
+  string display_name = 8;
+  // Used only to create the board when it does not exist yet.
+  Policy create_policy = 9;
+}
+
+message SubmitResponse {
+  bool  changed = 1;      // false when the aggregation kept the stored entry (not a new best)
+  Entry entry   = 2;      // the stored entry, with rank/position
+  int64 previous_score = 3;
+  bool  had_previous   = 4;
+  int64 total = 5;
+}
+
+message RangeRequest {
+  BoardRef ref = 1;
+  int64 start  = 2; // 1-based position
+  int64 limit  = 3; // default 25, max 100
+}
+
+message RangeResponse {
+  repeated Entry entries = 1;
+  int64 total = 2;
+  int64 hits  = 3; // FriendRanks: players found
+}
+
+message ByAccountsRequest {
+  BoardRef ref = 1;
+  repeated string accounts = 2;
+}
+
+message FriendRanksRequest {
+  BoardRef ref = 1;
+  string account = 2;
+  bool include_self = 3;
+  int64 offset = 4;
+  int64 limit  = 5;
+}
+
+message BoardInfoRequest { BoardRef ref = 1; }
+message BoardInfoResponse { Board board = 1; }
+message TotalRequest { BoardRef ref = 1; }
+message TotalResponse { int64 total = 1; }
+
+message SetDataRequest {
+  BoardRef ref = 1;
+  string account = 2;
+  int32  sub = 3;
+  int64  expect_score = 4;
+  bytes  data = 5;
+}
+message SetDataResponse { bool stored = 1; }
+
+message GetDataRequest {
+  BoardRef ref = 1;
+  string account = 2;
+  int32  sub = 3;
+}
+message GetDataResponse { bool found = 1; bytes data = 2; }
+
+message DeleteRequest {
+  BoardRef ref = 1;
+  string account = 2;
+  bool   one_sub = 3;
+  int32  sub = 4;
+}
+message DeleteResponse { int64 deleted = 1; }
+
+message UpsertBoardRequest {
+  BoardRef ref = 1;
+  Policy policy = 2;
+  string title_name = 3; // display name of the title, set when the title is created
+}
+
+message MapTitleRequest {
+  string title = 1;      // neutral title key
+  string name  = 2;
+  string network = 3;
+  string native_id = 4;
+}
+message MapTitleResponse { string title = 1; }
+
+message ResetBoardRequest { BoardRef ref = 1; }
+message ResetBoardResponse { int64 deleted = 1; }
+
+message ListBoardsRequest {
+  string network = 1; // when set with title, resolves like BoardRef; empty title lists every board
+  string title = 2;
+}
+message ListBoardsResponse {
+  repeated Board boards = 1;
+  repeated TitleName titles = 2;
+}
+message TitleName { string title = 1; string name = 2; }
