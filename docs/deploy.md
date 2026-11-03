@@ -18,6 +18,10 @@ GOWORK=off go run ./cmd/leaderboards
 | `LEADERBOARDS_INTERNAL_KEY` | what adapters (gRPC `x-internal-key`) and the erasure finaliser (`X-Internal-Key`) present |
 | `REWARDS_EVENTS_URL`, `REWARDS_EVENTS_KEY[_FILE]` | optional rewards events; off while unset |
 
+The website (v0.81.0+) reads `LEADERBOARDS_URL` (`http://openpak-leaderboards:20210`) and
+`LEADERBOARDS_INTERNAL_KEY` from the shared `.env`: `/healthz/leaderboards` for the status page and an
+account-erasure step. Both are optional there.
+
 ## Production (rootless Podman)
 
 1. Create the role and database: `podman exec openpak-postgres psql -U postgres -c 'CREATE DATABASE leaderboards'`.
