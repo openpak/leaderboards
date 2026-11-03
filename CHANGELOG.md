@@ -2,6 +2,10 @@
 
 `git log` stays the source of truth; this file is the readable summary.
 
+## v0.1.1 — 2026-11-03
+
+- Docs: website wiring (health route, erasure step).
+
 ## v0.1.0 — 2026-11-03
 
 - First release: the neutral board store (board #51, parent #40). Titles are keyed the same on
