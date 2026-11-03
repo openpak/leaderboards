@@ -18,6 +18,8 @@ import (
 	"github.com/openpak/leaderboards/internal/api"
 	"github.com/openpak/leaderboards/internal/core"
 	"github.com/openpak/leaderboards/internal/grpcapi"
+	"github.com/openpak/leaderboards/internal/grpclog"
+	"github.com/openpak/leaderboards/internal/httplog"
 	"github.com/openpak/leaderboards/internal/service"
 	"github.com/openpak/leaderboards/internal/store"
 	pb "github.com/openpak/leaderboards/proto/openpak/leaderboards/v1"
@@ -51,7 +53,7 @@ func main() {
 	httpAddr := env("LEADERBOARDS_HTTP_ADDR", "127.0.0.1:20210")
 	go func() {
 		log.Printf("leaderboards: http on %s", httpAddr)
-		srv := &http.Server{Addr: httpAddr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+		srv := &http.Server{Addr: httpAddr, Handler: httplog.Middleware(mux), ReadHeaderTimeout: 5 * time.Second}
 		log.Fatal(srv.ListenAndServe())
 	}()
 
@@ -60,7 +62,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("leaderboards: grpc listen: %v", err)
 	}
-	gs := grpc.NewServer(grpc.MaxRecvMsgSize(8 << 20))
+	gs := grpc.NewServer(grpc.ChainUnaryInterceptor(grpclog.Unary), grpc.MaxRecvMsgSize(8<<20))
 	pb.RegisterLeaderboardsServer(gs, grpcapi.New(svc, key))
 	go func() {
 		log.Printf("leaderboards: grpc on %s", grpcAddr)
