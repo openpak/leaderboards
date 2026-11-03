@@ -12,6 +12,9 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -56,6 +59,25 @@ func (s *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 // Unwrap lets http.ResponseController reach the real writer.
 func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
+// The ranking boards poll is constant: counted and summarised once a minute, not logged
+// per call (a failing poll still logs).
+var (
+	pollCount atomic.Int64
+	pollOnce  sync.Once
+)
+
+func isPoll(r *http.Request) bool {
+	return r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/internal/rankings/boards")
+}
+
+func summarise() {
+	for range time.Tick(time.Minute) {
+		if n := pollCount.Swap(0); n > 0 {
+			slog.Info("http poll summary", "path", "/internal/rankings/boards", "calls", n, "window_s", 60)
+		}
+	}
+}
+
 // Middleware logs one line per request after it completes.
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +92,11 @@ func Middleware(next http.Handler) http.Handler {
 		status := sw.status
 		if status == 0 {
 			status = http.StatusOK
+		}
+		if status < 400 && isPoll(r) {
+			pollOnce.Do(func() { go summarise() })
+			pollCount.Add(1)
+			return
 		}
 		if len(p) > 200 {
 			p = p[:200]

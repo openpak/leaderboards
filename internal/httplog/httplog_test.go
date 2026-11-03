@@ -76,3 +76,13 @@ func TestFlusherPreserved(t *testing.T) {
 		t.Fatal("handler did not run")
 	}
 }
+
+func TestRankingsPollCountedNotLogged(t *testing.T) {
+	buf := capture(t)
+	h := Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	before := pollCount.Load()
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/n/np/t/X/internal/rankings/boards", nil))
+	if buf.Len() != 0 || pollCount.Load() != before+1 {
+		t.Fatalf("poll logged or not counted: %q", buf.String())
+	}
+}
