@@ -80,7 +80,8 @@ The contract in the website repo (`docs/rankings-contract.md`) is served unauthe
 | `/n/{network}/t/{title}` | the same, as seen from one network, including its per-network boards |
 
 Append `/internal/rankings/boards` and `/internal/rankings/boards/{id}?limit=&offset=&around=`.
-Rows carry `account_id`; only boards holding at least one entry are listed. The website needs no
+Rows carry `account_id`; only boards holding at least one entry are listed, unless the board list is asked with `?all=1`
+(then boards nobody has scored on are listed too; the website uses it for its "no scores yet" view). The website needs no
 code change: a `rankingServers` entry for a title is `http://openpak-leaderboards:20210/t/terraria`.
 
 ## Store

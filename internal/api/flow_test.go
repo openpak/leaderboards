@@ -351,6 +351,12 @@ func TestRankingsContractAndErase(t *testing.T) {
 	if get("/n/np/t/terraria/internal/rankings/boards", &boards) != 200 || len(boards.Boards) != 1 {
 		t.Fatal("network-scoped route")
 	}
+	// ?all=1 also lists a board nobody has scored on.
+	e.lb.UpsertBoard(e.ctx, &pb.UpsertBoardRequest{Ref: ref("np", "NPWR04270_00", "1"), Policy: &pb.Policy{Name: "Empty"}})
+	if get("/t/terraria/internal/rankings/boards", &boards) != 200 || len(boards.Boards) != 1 ||
+		get("/t/terraria/internal/rankings/boards?all=1", &boards) != 200 || len(boards.Boards) != 2 {
+		t.Fatalf("all=1 boards: %+v", boards)
+	}
 	// A native id resolves through title_keys; an unmapped one stays raw and is empty.
 	if _, err := e.lb.MapTitle(e.ctx, &pb.MapTitleRequest{Title: "terraria", Name: "Terraria", Network: "np", NativeId: "NPWR04270_00"}); err != nil {
 		t.Fatal(err)

@@ -68,6 +68,10 @@ func (s *Server) scope(network, title string) http.Handler {
 			r2.URL.Path = r.URL.Path[i:]
 			r = r2
 		}
+		// ?all=1 on the board list also lists boards nobody has scored on yet (the website's "no scores yet" view).
+		if r.URL.Query().Get("all") == "1" {
+			r = r.WithContext(context.WithValue(r.Context(), allBoardsKey{}, true))
+		}
 		h.ServeHTTP(w, r)
 	})
 }
@@ -117,8 +121,11 @@ func neutral(b store.Board) string {
 	return "Board " + b.ID
 }
 
+type allBoardsKey struct{}
+
 func (s *source) Boards(ctx context.Context) ([]rankingsapi.Board, error) {
-	bs, err := s.svc.Store.Boards(ctx, s.title, true)
+	all, _ := ctx.Value(allBoardsKey{}).(bool)
+	bs, err := s.svc.Store.Boards(ctx, s.title, !all)
 	if err != nil {
 		return nil, err
 	}
