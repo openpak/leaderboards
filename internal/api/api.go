@@ -47,7 +47,14 @@ func (s *Server) Register(mux *http.ServeMux) {
 		s.scope("", r.PathValue("title")).ServeHTTP(w, r)
 	})
 	mux.HandleFunc("/n/{network}/t/{title}/{rest...}", func(w http.ResponseWriter, r *http.Request) {
-		s.scope(r.PathValue("network"), r.PathValue("title")).ServeHTTP(w, r)
+		// The title segment is a native id on that network (an NPWR id, an Xbox title id, a Switch
+		// application id) or already the neutral key: resolve it, and keep the raw value when it
+		// is not mapped.
+		network, title := r.PathValue("network"), r.PathValue("title")
+		if k, err := s.Svc.Store.ResolveTitle(r.Context(), network, title, false); err == nil {
+			title = k
+		}
+		s.scope(network, title).ServeHTTP(w, r)
 	})
 }
 

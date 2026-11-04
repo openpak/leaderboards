@@ -2,6 +2,10 @@
 
 `git log` stays the source of truth; this file is the readable summary.
 
+## v0.2.2 — 2026-11-04
+- `/n/{network}/t/{title}`: the title segment is resolved as a native id on that network (`ResolveTitle`, no create) and falls back to the raw
+  value, so `/n/np/t/NPWR…` and `/n/x360/t/<hex>` serve the mapped title's boards instead of an empty list. Test added.
+
 ## v0.2.1 — 2026-11-03
 - GET .../internal/rankings/boards (constant poll) is counted and summarised once a minute instead of logged per call; failures still log.
 

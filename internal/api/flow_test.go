@@ -351,6 +351,16 @@ func TestRankingsContractAndErase(t *testing.T) {
 	if get("/n/np/t/terraria/internal/rankings/boards", &boards) != 200 || len(boards.Boards) != 1 {
 		t.Fatal("network-scoped route")
 	}
+	// A native id resolves through title_keys; an unmapped one stays raw and is empty.
+	if _, err := e.lb.MapTitle(e.ctx, &pb.MapTitleRequest{Title: "terraria", Name: "Terraria", Network: "np", NativeId: "NPWR04270_00"}); err != nil {
+		t.Fatal(err)
+	}
+	if get("/n/np/t/NPWR04270_00/internal/rankings/boards", &boards) != 200 || len(boards.Boards) != 1 {
+		t.Fatalf("native id route: %+v", boards)
+	}
+	if get("/n/np/t/NPWR99999_00/internal/rankings/boards", &boards) != 200 || len(boards.Boards) != 0 {
+		t.Fatalf("unmapped native id: %+v", boards)
+	}
 
 	// Erasure needs the key, then removes the account everywhere; a repeat is a 200.
 	del := func(k string) int {
