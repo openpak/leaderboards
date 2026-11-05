@@ -191,22 +191,22 @@ func (s *source) Rows(ctx context.Context, id string, q rankingsapi.Query) (rank
 	if err != nil {
 		return rankingsapi.Page{}, err
 	}
-	total, err := s.svc.Store.Total(ctx, b, s.network)
+	total, err := s.svc.Store.Total(ctx, b, s.network, nil)
 	if err != nil {
 		return rankingsapi.Page{}, err
 	}
 	if total == 0 {
 		return rankingsapi.Page{}, nil
 	}
-	es, err := s.svc.Store.Range(ctx, b, s.network, int64(q.Offset)+1, int64(q.Limit))
+	es, err := s.svc.Store.Range(ctx, b, s.network, int64(q.Offset)+1, int64(q.Limit), nil)
 	if err != nil {
 		return rankingsapi.Page{}, err
 	}
 	p := rankingsapi.Page{Total: int(total), Rows: rows(b, es)}
 	if q.Around != "" {
-		mine, err := s.svc.Store.Accounts(ctx, b, s.network, []string{q.Around})
+		mine, err := s.svc.Store.Accounts(ctx, b, s.network, []string{q.Around}, nil)
 		if err == nil && len(mine) > 0 {
-			near, err := s.svc.Store.Range(ctx, b, s.network, max(mine[0].Position-rankingsapi.AroundSpan, 1), 2*rankingsapi.AroundSpan+1)
+			near, err := s.svc.Store.Range(ctx, b, s.network, max(mine[0].Position-rankingsapi.AroundSpan, 1), 2*rankingsapi.AroundSpan+1, nil)
 			if err != nil {
 				return rankingsapi.Page{}, err
 			}

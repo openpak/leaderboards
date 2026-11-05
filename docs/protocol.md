@@ -42,6 +42,14 @@ call and only changes the fields it sets.
   the stored `entry` with `rank` and `position`, the previous score and `total`. `changed=false`
   means the aggregation kept the stored entry (PS3 "not best"). A changed score replaces comment and info
   and drops game data. Limits: comment 512 bytes, info 4096, 64 columns.
+* Optional on `Submit` (v0.3.0, additive): `groups` (up to 256 bytes, stored on the entry row,
+  score-bound like info) and `aggregation_override` (`"latest"` or `"force"`: this one call replaces
+  the stored entry whatever the board's aggregation, e.g. NEX `UpdateModeDeleteOld` in one atomic call;
+  the board policy is untouched; any other value is `InvalidArgument`).
+* `groups_filter {group_index, group_value}` on `Range`, `Total`, `ByAccounts` and `FriendRanks`
+  keeps entries whose `groups[group_index] == group_value` (an entry with no such byte never
+  matches; a negative index or no filter means everything). Ranks, positions and totals are among
+  the matching entries. `Entry.groups` returns the stored bytes.
 * `Range(ref, start, limit)` is by 1-based position (limit default 25, max 100) with `total`.
 * `ByAccounts(ref, accounts)` is every entry (all `sub`) of those accounts, best first.
 * `FriendRanks(ref, account, include_self, offset, limit)` asks the account core for the friend
@@ -51,7 +59,9 @@ call and only changes the fields it sets.
   `ResetBoard`, `ListBoards`.
 * `rank` is the competition rank (equal scores share it); `position` is unique, ordered by
   score, then `updated`, then account, then `sub`. `sub` is an adapter-chosen slot per account
-  (PS3 pcId; 0 elsewhere).
+  (PS3 pcId; 0 elsewhere). The key is `(account, sub)` with a 32-bit `sub`, so one account can hold
+  several entries per board; NEX deliberately uses one (sub 0) per player per category, which is
+  what its `UpdateModeNormal` means, so no wider key was added.
 * Errors: `InvalidArgument` (bad account, policy), `ResourceExhausted` (too large),
   `FailedPrecondition` (a per-network board read without a network), `NotFound`.
 
@@ -87,4 +97,6 @@ code change: a `rankingServers` entry for a title is `http://openpak-leaderboard
 ## Store
 
 Postgres `leaderboards`: `titles`, `title_keys`, `boards`, `entries` (primary key
-`(title_key, board_id, account, sub)`, index on `(title_key, board_id, score)`). Migrated at start.
+`(title_key, board_id, account, sub)`, index on `(title_key, board_id, score)`; `groups bytea`
+is a column of the entry row, so account erasure removes it with the row). Migrated at start
+(`ADD COLUMN IF NOT EXISTS groups`, no rewrite of existing rows).

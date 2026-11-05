@@ -288,6 +288,7 @@ type Entry struct {
 	UpdatedUnixMs int64                  `protobuf:"varint,10,opt,name=updated_unix_ms,json=updatedUnixMs,proto3" json:"updated_unix_ms,omitempty"`
 	Rank          int64                  `protobuf:"varint,11,opt,name=rank,proto3" json:"rank,omitempty"`         // competition rank: ties share it
 	Position      int64                  `protobuf:"varint,12,opt,name=position,proto3" json:"position,omitempty"` // unique 1-based position
+	Groups        []byte                 `protobuf:"bytes,13,opt,name=groups,proto3" json:"groups,omitempty"`      // optional; set by SubmitRequest.groups
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -406,6 +407,67 @@ func (x *Entry) GetPosition() int64 {
 	return 0
 }
 
+func (x *Entry) GetGroups() []byte {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+// GroupsFilter keeps entries whose groups byte at group_index equals group_value (an entry with
+// no such byte never matches). Ranks, positions and totals are among the matching entries.
+type GroupsFilter struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GroupIndex    int32                  `protobuf:"varint,1,opt,name=group_index,json=groupIndex,proto3" json:"group_index,omitempty"` // 0-based; negative = no filter
+	GroupValue    uint32                 `protobuf:"varint,2,opt,name=group_value,json=groupValue,proto3" json:"group_value,omitempty"` // 0..255 can match
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GroupsFilter) Reset() {
+	*x = GroupsFilter{}
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GroupsFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GroupsFilter) ProtoMessage() {}
+
+func (x *GroupsFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GroupsFilter.ProtoReflect.Descriptor instead.
+func (*GroupsFilter) Descriptor() ([]byte, []int) {
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GroupsFilter) GetGroupIndex() int32 {
+	if x != nil {
+		return x.GroupIndex
+	}
+	return 0
+}
+
+func (x *GroupsFilter) GetGroupValue() uint32 {
+	if x != nil {
+		return x.GroupValue
+	}
+	return 0
+}
+
 type BoardRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Network       string                 `protobuf:"bytes,1,opt,name=network,proto3" json:"network,omitempty"` // the caller's network
@@ -417,7 +479,7 @@ type BoardRef struct {
 
 func (x *BoardRef) Reset() {
 	*x = BoardRef{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[3]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -429,7 +491,7 @@ func (x *BoardRef) String() string {
 func (*BoardRef) ProtoMessage() {}
 
 func (x *BoardRef) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[3]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -442,7 +504,7 @@ func (x *BoardRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BoardRef.ProtoReflect.Descriptor instead.
 func (*BoardRef) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{3}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *BoardRef) GetNetwork() string {
@@ -477,14 +539,20 @@ type SubmitRequest struct {
 	Info        []byte                 `protobuf:"bytes,7,opt,name=info,proto3" json:"info,omitempty"`
 	DisplayName string                 `protobuf:"bytes,8,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// Used only to create the board when it does not exist yet.
-	CreatePolicy  *Policy `protobuf:"bytes,9,opt,name=create_policy,json=createPolicy,proto3" json:"create_policy,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	CreatePolicy *Policy `protobuf:"bytes,9,opt,name=create_policy,json=createPolicy,proto3" json:"create_policy,omitempty"`
+	// Optional per-entry group bytes (NEX ranking groups). Score-bound like info: stored with the
+	// score, replaced whenever the score is replaced. Filterable with GroupsFilter.
+	Groups []byte `protobuf:"bytes,10,opt,name=groups,proto3" json:"groups,omitempty"`
+	// Optional "latest" (alias "force"): this call replaces the stored entry whatever the board's
+	// aggregation (NEX UpdateModeDeleteOld, in one atomic call). Any other value is invalid.
+	AggregationOverride string `protobuf:"bytes,11,opt,name=aggregation_override,json=aggregationOverride,proto3" json:"aggregation_override,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *SubmitRequest) Reset() {
 	*x = SubmitRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[4]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -496,7 +564,7 @@ func (x *SubmitRequest) String() string {
 func (*SubmitRequest) ProtoMessage() {}
 
 func (x *SubmitRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[4]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -509,7 +577,7 @@ func (x *SubmitRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitRequest.ProtoReflect.Descriptor instead.
 func (*SubmitRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{4}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SubmitRequest) GetRef() *BoardRef {
@@ -575,6 +643,20 @@ func (x *SubmitRequest) GetCreatePolicy() *Policy {
 	return nil
 }
 
+func (x *SubmitRequest) GetGroups() []byte {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+func (x *SubmitRequest) GetAggregationOverride() string {
+	if x != nil {
+		return x.AggregationOverride
+	}
+	return ""
+}
+
 type SubmitResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Changed       bool                   `protobuf:"varint,1,opt,name=changed,proto3" json:"changed,omitempty"` // false when the aggregation kept the stored entry (not a new best)
@@ -588,7 +670,7 @@ type SubmitResponse struct {
 
 func (x *SubmitResponse) Reset() {
 	*x = SubmitResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[5]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -600,7 +682,7 @@ func (x *SubmitResponse) String() string {
 func (*SubmitResponse) ProtoMessage() {}
 
 func (x *SubmitResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[5]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -613,7 +695,7 @@ func (x *SubmitResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitResponse.ProtoReflect.Descriptor instead.
 func (*SubmitResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{5}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SubmitResponse) GetChanged() bool {
@@ -656,13 +738,14 @@ type RangeRequest struct {
 	Ref           *BoardRef              `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
 	Start         int64                  `protobuf:"varint,2,opt,name=start,proto3" json:"start,omitempty"` // 1-based position
 	Limit         int64                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"` // default 25, max 100
+	GroupsFilter  *GroupsFilter          `protobuf:"bytes,4,opt,name=groups_filter,json=groupsFilter,proto3" json:"groups_filter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RangeRequest) Reset() {
 	*x = RangeRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[6]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -674,7 +757,7 @@ func (x *RangeRequest) String() string {
 func (*RangeRequest) ProtoMessage() {}
 
 func (x *RangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[6]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -687,7 +770,7 @@ func (x *RangeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RangeRequest.ProtoReflect.Descriptor instead.
 func (*RangeRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{6}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RangeRequest) GetRef() *BoardRef {
@@ -711,6 +794,13 @@ func (x *RangeRequest) GetLimit() int64 {
 	return 0
 }
 
+func (x *RangeRequest) GetGroupsFilter() *GroupsFilter {
+	if x != nil {
+		return x.GroupsFilter
+	}
+	return nil
+}
+
 type RangeResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Entries       []*Entry               `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
@@ -722,7 +812,7 @@ type RangeResponse struct {
 
 func (x *RangeResponse) Reset() {
 	*x = RangeResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[7]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -734,7 +824,7 @@ func (x *RangeResponse) String() string {
 func (*RangeResponse) ProtoMessage() {}
 
 func (x *RangeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[7]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -747,7 +837,7 @@ func (x *RangeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RangeResponse.ProtoReflect.Descriptor instead.
 func (*RangeResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{7}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RangeResponse) GetEntries() []*Entry {
@@ -775,13 +865,14 @@ type ByAccountsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ref           *BoardRef              `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
 	Accounts      []string               `protobuf:"bytes,2,rep,name=accounts,proto3" json:"accounts,omitempty"`
+	GroupsFilter  *GroupsFilter          `protobuf:"bytes,3,opt,name=groups_filter,json=groupsFilter,proto3" json:"groups_filter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ByAccountsRequest) Reset() {
 	*x = ByAccountsRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[8]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -793,7 +884,7 @@ func (x *ByAccountsRequest) String() string {
 func (*ByAccountsRequest) ProtoMessage() {}
 
 func (x *ByAccountsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[8]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -806,7 +897,7 @@ func (x *ByAccountsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ByAccountsRequest.ProtoReflect.Descriptor instead.
 func (*ByAccountsRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{8}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ByAccountsRequest) GetRef() *BoardRef {
@@ -823,6 +914,13 @@ func (x *ByAccountsRequest) GetAccounts() []string {
 	return nil
 }
 
+func (x *ByAccountsRequest) GetGroupsFilter() *GroupsFilter {
+	if x != nil {
+		return x.GroupsFilter
+	}
+	return nil
+}
+
 type FriendRanksRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ref           *BoardRef              `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
@@ -830,13 +928,14 @@ type FriendRanksRequest struct {
 	IncludeSelf   bool                   `protobuf:"varint,3,opt,name=include_self,json=includeSelf,proto3" json:"include_self,omitempty"`
 	Offset        int64                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
 	Limit         int64                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	GroupsFilter  *GroupsFilter          `protobuf:"bytes,6,opt,name=groups_filter,json=groupsFilter,proto3" json:"groups_filter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FriendRanksRequest) Reset() {
 	*x = FriendRanksRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[9]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -848,7 +947,7 @@ func (x *FriendRanksRequest) String() string {
 func (*FriendRanksRequest) ProtoMessage() {}
 
 func (x *FriendRanksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[9]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -861,7 +960,7 @@ func (x *FriendRanksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FriendRanksRequest.ProtoReflect.Descriptor instead.
 func (*FriendRanksRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{9}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *FriendRanksRequest) GetRef() *BoardRef {
@@ -899,6 +998,13 @@ func (x *FriendRanksRequest) GetLimit() int64 {
 	return 0
 }
 
+func (x *FriendRanksRequest) GetGroupsFilter() *GroupsFilter {
+	if x != nil {
+		return x.GroupsFilter
+	}
+	return nil
+}
+
 type BoardInfoRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ref           *BoardRef              `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
@@ -908,7 +1014,7 @@ type BoardInfoRequest struct {
 
 func (x *BoardInfoRequest) Reset() {
 	*x = BoardInfoRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[10]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -920,7 +1026,7 @@ func (x *BoardInfoRequest) String() string {
 func (*BoardInfoRequest) ProtoMessage() {}
 
 func (x *BoardInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[10]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -933,7 +1039,7 @@ func (x *BoardInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BoardInfoRequest.ProtoReflect.Descriptor instead.
 func (*BoardInfoRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{10}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *BoardInfoRequest) GetRef() *BoardRef {
@@ -952,7 +1058,7 @@ type BoardInfoResponse struct {
 
 func (x *BoardInfoResponse) Reset() {
 	*x = BoardInfoResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[11]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -964,7 +1070,7 @@ func (x *BoardInfoResponse) String() string {
 func (*BoardInfoResponse) ProtoMessage() {}
 
 func (x *BoardInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[11]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -977,7 +1083,7 @@ func (x *BoardInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BoardInfoResponse.ProtoReflect.Descriptor instead.
 func (*BoardInfoResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{11}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *BoardInfoResponse) GetBoard() *Board {
@@ -990,13 +1096,14 @@ func (x *BoardInfoResponse) GetBoard() *Board {
 type TotalRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ref           *BoardRef              `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	GroupsFilter  *GroupsFilter          `protobuf:"bytes,2,opt,name=groups_filter,json=groupsFilter,proto3" json:"groups_filter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TotalRequest) Reset() {
 	*x = TotalRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[12]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1008,7 +1115,7 @@ func (x *TotalRequest) String() string {
 func (*TotalRequest) ProtoMessage() {}
 
 func (x *TotalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[12]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1021,12 +1128,19 @@ func (x *TotalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TotalRequest.ProtoReflect.Descriptor instead.
 func (*TotalRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{12}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *TotalRequest) GetRef() *BoardRef {
 	if x != nil {
 		return x.Ref
+	}
+	return nil
+}
+
+func (x *TotalRequest) GetGroupsFilter() *GroupsFilter {
+	if x != nil {
+		return x.GroupsFilter
 	}
 	return nil
 }
@@ -1040,7 +1154,7 @@ type TotalResponse struct {
 
 func (x *TotalResponse) Reset() {
 	*x = TotalResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[13]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1052,7 +1166,7 @@ func (x *TotalResponse) String() string {
 func (*TotalResponse) ProtoMessage() {}
 
 func (x *TotalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[13]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1065,7 +1179,7 @@ func (x *TotalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TotalResponse.ProtoReflect.Descriptor instead.
 func (*TotalResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{13}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *TotalResponse) GetTotal() int64 {
@@ -1088,7 +1202,7 @@ type SetDataRequest struct {
 
 func (x *SetDataRequest) Reset() {
 	*x = SetDataRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[14]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1100,7 +1214,7 @@ func (x *SetDataRequest) String() string {
 func (*SetDataRequest) ProtoMessage() {}
 
 func (x *SetDataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[14]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1113,7 +1227,7 @@ func (x *SetDataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDataRequest.ProtoReflect.Descriptor instead.
 func (*SetDataRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{14}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *SetDataRequest) GetRef() *BoardRef {
@@ -1160,7 +1274,7 @@ type SetDataResponse struct {
 
 func (x *SetDataResponse) Reset() {
 	*x = SetDataResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[15]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1172,7 +1286,7 @@ func (x *SetDataResponse) String() string {
 func (*SetDataResponse) ProtoMessage() {}
 
 func (x *SetDataResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[15]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1185,7 +1299,7 @@ func (x *SetDataResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDataResponse.ProtoReflect.Descriptor instead.
 func (*SetDataResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{15}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SetDataResponse) GetStored() bool {
@@ -1206,7 +1320,7 @@ type GetDataRequest struct {
 
 func (x *GetDataRequest) Reset() {
 	*x = GetDataRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[16]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1218,7 +1332,7 @@ func (x *GetDataRequest) String() string {
 func (*GetDataRequest) ProtoMessage() {}
 
 func (x *GetDataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[16]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1231,7 +1345,7 @@ func (x *GetDataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDataRequest.ProtoReflect.Descriptor instead.
 func (*GetDataRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{16}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetDataRequest) GetRef() *BoardRef {
@@ -1265,7 +1379,7 @@ type GetDataResponse struct {
 
 func (x *GetDataResponse) Reset() {
 	*x = GetDataResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[17]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1277,7 +1391,7 @@ func (x *GetDataResponse) String() string {
 func (*GetDataResponse) ProtoMessage() {}
 
 func (x *GetDataResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[17]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1290,7 +1404,7 @@ func (x *GetDataResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDataResponse.ProtoReflect.Descriptor instead.
 func (*GetDataResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{17}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetDataResponse) GetFound() bool {
@@ -1319,7 +1433,7 @@ type DeleteRequest struct {
 
 func (x *DeleteRequest) Reset() {
 	*x = DeleteRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[18]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1331,7 +1445,7 @@ func (x *DeleteRequest) String() string {
 func (*DeleteRequest) ProtoMessage() {}
 
 func (x *DeleteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[18]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1344,7 +1458,7 @@ func (x *DeleteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{18}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DeleteRequest) GetRef() *BoardRef {
@@ -1384,7 +1498,7 @@ type DeleteResponse struct {
 
 func (x *DeleteResponse) Reset() {
 	*x = DeleteResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[19]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1396,7 +1510,7 @@ func (x *DeleteResponse) String() string {
 func (*DeleteResponse) ProtoMessage() {}
 
 func (x *DeleteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[19]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1409,7 +1523,7 @@ func (x *DeleteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteResponse.ProtoReflect.Descriptor instead.
 func (*DeleteResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{19}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *DeleteResponse) GetDeleted() int64 {
@@ -1430,7 +1544,7 @@ type UpsertBoardRequest struct {
 
 func (x *UpsertBoardRequest) Reset() {
 	*x = UpsertBoardRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[20]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1442,7 +1556,7 @@ func (x *UpsertBoardRequest) String() string {
 func (*UpsertBoardRequest) ProtoMessage() {}
 
 func (x *UpsertBoardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[20]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1455,7 +1569,7 @@ func (x *UpsertBoardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpsertBoardRequest.ProtoReflect.Descriptor instead.
 func (*UpsertBoardRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{20}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *UpsertBoardRequest) GetRef() *BoardRef {
@@ -1491,7 +1605,7 @@ type MapTitleRequest struct {
 
 func (x *MapTitleRequest) Reset() {
 	*x = MapTitleRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[21]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1503,7 +1617,7 @@ func (x *MapTitleRequest) String() string {
 func (*MapTitleRequest) ProtoMessage() {}
 
 func (x *MapTitleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[21]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1516,7 +1630,7 @@ func (x *MapTitleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MapTitleRequest.ProtoReflect.Descriptor instead.
 func (*MapTitleRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{21}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *MapTitleRequest) GetTitle() string {
@@ -1556,7 +1670,7 @@ type MapTitleResponse struct {
 
 func (x *MapTitleResponse) Reset() {
 	*x = MapTitleResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[22]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1568,7 +1682,7 @@ func (x *MapTitleResponse) String() string {
 func (*MapTitleResponse) ProtoMessage() {}
 
 func (x *MapTitleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[22]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1581,7 +1695,7 @@ func (x *MapTitleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MapTitleResponse.ProtoReflect.Descriptor instead.
 func (*MapTitleResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{22}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *MapTitleResponse) GetTitle() string {
@@ -1600,7 +1714,7 @@ type ResetBoardRequest struct {
 
 func (x *ResetBoardRequest) Reset() {
 	*x = ResetBoardRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[23]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1612,7 +1726,7 @@ func (x *ResetBoardRequest) String() string {
 func (*ResetBoardRequest) ProtoMessage() {}
 
 func (x *ResetBoardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[23]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1625,7 +1739,7 @@ func (x *ResetBoardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetBoardRequest.ProtoReflect.Descriptor instead.
 func (*ResetBoardRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{23}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ResetBoardRequest) GetRef() *BoardRef {
@@ -1644,7 +1758,7 @@ type ResetBoardResponse struct {
 
 func (x *ResetBoardResponse) Reset() {
 	*x = ResetBoardResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[24]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1656,7 +1770,7 @@ func (x *ResetBoardResponse) String() string {
 func (*ResetBoardResponse) ProtoMessage() {}
 
 func (x *ResetBoardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[24]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1669,7 +1783,7 @@ func (x *ResetBoardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetBoardResponse.ProtoReflect.Descriptor instead.
 func (*ResetBoardResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{24}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ResetBoardResponse) GetDeleted() int64 {
@@ -1689,7 +1803,7 @@ type ListBoardsRequest struct {
 
 func (x *ListBoardsRequest) Reset() {
 	*x = ListBoardsRequest{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[25]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1701,7 +1815,7 @@ func (x *ListBoardsRequest) String() string {
 func (*ListBoardsRequest) ProtoMessage() {}
 
 func (x *ListBoardsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[25]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1714,7 +1828,7 @@ func (x *ListBoardsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBoardsRequest.ProtoReflect.Descriptor instead.
 func (*ListBoardsRequest) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{25}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListBoardsRequest) GetNetwork() string {
@@ -1741,7 +1855,7 @@ type ListBoardsResponse struct {
 
 func (x *ListBoardsResponse) Reset() {
 	*x = ListBoardsResponse{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[26]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1753,7 +1867,7 @@ func (x *ListBoardsResponse) String() string {
 func (*ListBoardsResponse) ProtoMessage() {}
 
 func (x *ListBoardsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[26]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1766,7 +1880,7 @@ func (x *ListBoardsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBoardsResponse.ProtoReflect.Descriptor instead.
 func (*ListBoardsResponse) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{26}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ListBoardsResponse) GetBoards() []*Board {
@@ -1793,7 +1907,7 @@ type TitleName struct {
 
 func (x *TitleName) Reset() {
 	*x = TitleName{}
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[27]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1805,7 +1919,7 @@ func (x *TitleName) String() string {
 func (*TitleName) ProtoMessage() {}
 
 func (x *TitleName) ProtoReflect() protoreflect.Message {
-	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[27]
+	mi := &file_openpak_leaderboards_v1_leaderboards_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1818,7 +1932,7 @@ func (x *TitleName) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TitleName.ProtoReflect.Descriptor instead.
 func (*TitleName) Descriptor() ([]byte, []int) {
-	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{27}
+	return file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *TitleName) GetTitle() string {
@@ -1864,7 +1978,7 @@ const file_openpak_leaderboards_v1_leaderboards_proto_rawDesc = "" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x127\n" +
 	"\x06policy\x18\x03 \x01(\v2\x1f.openpak.leaderboards.v1.PolicyR\x06policy\x12#\n" +
-	"\rcross_network\x18\x04 \x01(\bR\fcrossNetwork\"\xaa\x03\n" +
+	"\rcross_network\x18\x04 \x01(\bR\fcrossNetwork\"\xc2\x03\n" +
 	"\x05Entry\x12\x18\n" +
 	"\aaccount\x18\x01 \x01(\tR\aaccount\x12\x10\n" +
 	"\x03sub\x18\x02 \x01(\x05R\x03sub\x12\x14\n" +
@@ -1878,14 +1992,20 @@ const file_openpak_leaderboards_v1_leaderboards_proto_rawDesc = "" +
 	"\x0fupdated_unix_ms\x18\n" +
 	" \x01(\x03R\rupdatedUnixMs\x12\x12\n" +
 	"\x04rank\x18\v \x01(\x03R\x04rank\x12\x1a\n" +
-	"\bposition\x18\f \x01(\x03R\bposition\x1a:\n" +
+	"\bposition\x18\f \x01(\x03R\bposition\x12\x16\n" +
+	"\x06groups\x18\r \x01(\fR\x06groups\x1a:\n" +
 	"\fColumnsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"P\n" +
+	"\fGroupsFilter\x12\x1f\n" +
+	"\vgroup_index\x18\x01 \x01(\x05R\n" +
+	"groupIndex\x12\x1f\n" +
+	"\vgroup_value\x18\x02 \x01(\rR\n" +
+	"groupValue\"P\n" +
 	"\bBoardRef\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x14\n" +
-	"\x05board\x18\x03 \x01(\tR\x05board\"\xa8\x03\n" +
+	"\x05board\x18\x03 \x01(\tR\x05board\"\xf3\x03\n" +
 	"\rSubmitRequest\x123\n" +
 	"\x03ref\x18\x01 \x01(\v2!.openpak.leaderboards.v1.BoardRefR\x03ref\x12\x18\n" +
 	"\aaccount\x18\x02 \x01(\tR\aaccount\x12\x10\n" +
@@ -1895,7 +2015,10 @@ const file_openpak_leaderboards_v1_leaderboards_proto_rawDesc = "" +
 	"\acomment\x18\x06 \x01(\tR\acomment\x12\x12\n" +
 	"\x04info\x18\a \x01(\fR\x04info\x12!\n" +
 	"\fdisplay_name\x18\b \x01(\tR\vdisplayName\x12D\n" +
-	"\rcreate_policy\x18\t \x01(\v2\x1f.openpak.leaderboards.v1.PolicyR\fcreatePolicy\x1a:\n" +
+	"\rcreate_policy\x18\t \x01(\v2\x1f.openpak.leaderboards.v1.PolicyR\fcreatePolicy\x12\x16\n" +
+	"\x06groups\x18\n" +
+	" \x01(\fR\x06groups\x121\n" +
+	"\x14aggregation_override\x18\v \x01(\tR\x13aggregationOverride\x1a:\n" +
 	"\fColumnsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\xc0\x01\n" +
@@ -1904,30 +2027,34 @@ const file_openpak_leaderboards_v1_leaderboards_proto_rawDesc = "" +
 	"\x05entry\x18\x02 \x01(\v2\x1e.openpak.leaderboards.v1.EntryR\x05entry\x12%\n" +
 	"\x0eprevious_score\x18\x03 \x01(\x03R\rpreviousScore\x12!\n" +
 	"\fhad_previous\x18\x04 \x01(\bR\vhadPrevious\x12\x14\n" +
-	"\x05total\x18\x05 \x01(\x03R\x05total\"o\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xbb\x01\n" +
 	"\fRangeRequest\x123\n" +
 	"\x03ref\x18\x01 \x01(\v2!.openpak.leaderboards.v1.BoardRefR\x03ref\x12\x14\n" +
 	"\x05start\x18\x02 \x01(\x03R\x05start\x12\x14\n" +
-	"\x05limit\x18\x03 \x01(\x03R\x05limit\"s\n" +
+	"\x05limit\x18\x03 \x01(\x03R\x05limit\x12J\n" +
+	"\rgroups_filter\x18\x04 \x01(\v2%.openpak.leaderboards.v1.GroupsFilterR\fgroupsFilter\"s\n" +
 	"\rRangeResponse\x128\n" +
 	"\aentries\x18\x01 \x03(\v2\x1e.openpak.leaderboards.v1.EntryR\aentries\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x03R\x05total\x12\x12\n" +
-	"\x04hits\x18\x03 \x01(\x03R\x04hits\"d\n" +
+	"\x04hits\x18\x03 \x01(\x03R\x04hits\"\xb0\x01\n" +
 	"\x11ByAccountsRequest\x123\n" +
 	"\x03ref\x18\x01 \x01(\v2!.openpak.leaderboards.v1.BoardRefR\x03ref\x12\x1a\n" +
-	"\baccounts\x18\x02 \x03(\tR\baccounts\"\xb4\x01\n" +
+	"\baccounts\x18\x02 \x03(\tR\baccounts\x12J\n" +
+	"\rgroups_filter\x18\x03 \x01(\v2%.openpak.leaderboards.v1.GroupsFilterR\fgroupsFilter\"\x80\x02\n" +
 	"\x12FriendRanksRequest\x123\n" +
 	"\x03ref\x18\x01 \x01(\v2!.openpak.leaderboards.v1.BoardRefR\x03ref\x12\x18\n" +
 	"\aaccount\x18\x02 \x01(\tR\aaccount\x12!\n" +
 	"\finclude_self\x18\x03 \x01(\bR\vincludeSelf\x12\x16\n" +
 	"\x06offset\x18\x04 \x01(\x03R\x06offset\x12\x14\n" +
-	"\x05limit\x18\x05 \x01(\x03R\x05limit\"G\n" +
+	"\x05limit\x18\x05 \x01(\x03R\x05limit\x12J\n" +
+	"\rgroups_filter\x18\x06 \x01(\v2%.openpak.leaderboards.v1.GroupsFilterR\fgroupsFilter\"G\n" +
 	"\x10BoardInfoRequest\x123\n" +
 	"\x03ref\x18\x01 \x01(\v2!.openpak.leaderboards.v1.BoardRefR\x03ref\"I\n" +
 	"\x11BoardInfoResponse\x124\n" +
-	"\x05board\x18\x01 \x01(\v2\x1e.openpak.leaderboards.v1.BoardR\x05board\"C\n" +
+	"\x05board\x18\x01 \x01(\v2\x1e.openpak.leaderboards.v1.BoardR\x05board\"\x8f\x01\n" +
 	"\fTotalRequest\x123\n" +
-	"\x03ref\x18\x01 \x01(\v2!.openpak.leaderboards.v1.BoardRefR\x03ref\"%\n" +
+	"\x03ref\x18\x01 \x01(\v2!.openpak.leaderboards.v1.BoardRefR\x03ref\x12J\n" +
+	"\rgroups_filter\x18\x02 \x01(\v2%.openpak.leaderboards.v1.GroupsFilterR\fgroupsFilter\"%\n" +
 	"\rTotalResponse\x12\x14\n" +
 	"\x05total\x18\x01 \x01(\x03R\x05total\"\xa8\x01\n" +
 	"\x0eSetDataRequest\x123\n" +
@@ -2012,96 +2139,101 @@ func file_openpak_leaderboards_v1_leaderboards_proto_rawDescGZIP() []byte {
 }
 
 var file_openpak_leaderboards_v1_leaderboards_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_openpak_leaderboards_v1_leaderboards_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_openpak_leaderboards_v1_leaderboards_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_openpak_leaderboards_v1_leaderboards_proto_goTypes = []any{
 	(Tristate)(0),              // 0: openpak.leaderboards.v1.Tristate
 	(*Policy)(nil),             // 1: openpak.leaderboards.v1.Policy
 	(*Board)(nil),              // 2: openpak.leaderboards.v1.Board
 	(*Entry)(nil),              // 3: openpak.leaderboards.v1.Entry
-	(*BoardRef)(nil),           // 4: openpak.leaderboards.v1.BoardRef
-	(*SubmitRequest)(nil),      // 5: openpak.leaderboards.v1.SubmitRequest
-	(*SubmitResponse)(nil),     // 6: openpak.leaderboards.v1.SubmitResponse
-	(*RangeRequest)(nil),       // 7: openpak.leaderboards.v1.RangeRequest
-	(*RangeResponse)(nil),      // 8: openpak.leaderboards.v1.RangeResponse
-	(*ByAccountsRequest)(nil),  // 9: openpak.leaderboards.v1.ByAccountsRequest
-	(*FriendRanksRequest)(nil), // 10: openpak.leaderboards.v1.FriendRanksRequest
-	(*BoardInfoRequest)(nil),   // 11: openpak.leaderboards.v1.BoardInfoRequest
-	(*BoardInfoResponse)(nil),  // 12: openpak.leaderboards.v1.BoardInfoResponse
-	(*TotalRequest)(nil),       // 13: openpak.leaderboards.v1.TotalRequest
-	(*TotalResponse)(nil),      // 14: openpak.leaderboards.v1.TotalResponse
-	(*SetDataRequest)(nil),     // 15: openpak.leaderboards.v1.SetDataRequest
-	(*SetDataResponse)(nil),    // 16: openpak.leaderboards.v1.SetDataResponse
-	(*GetDataRequest)(nil),     // 17: openpak.leaderboards.v1.GetDataRequest
-	(*GetDataResponse)(nil),    // 18: openpak.leaderboards.v1.GetDataResponse
-	(*DeleteRequest)(nil),      // 19: openpak.leaderboards.v1.DeleteRequest
-	(*DeleteResponse)(nil),     // 20: openpak.leaderboards.v1.DeleteResponse
-	(*UpsertBoardRequest)(nil), // 21: openpak.leaderboards.v1.UpsertBoardRequest
-	(*MapTitleRequest)(nil),    // 22: openpak.leaderboards.v1.MapTitleRequest
-	(*MapTitleResponse)(nil),   // 23: openpak.leaderboards.v1.MapTitleResponse
-	(*ResetBoardRequest)(nil),  // 24: openpak.leaderboards.v1.ResetBoardRequest
-	(*ResetBoardResponse)(nil), // 25: openpak.leaderboards.v1.ResetBoardResponse
-	(*ListBoardsRequest)(nil),  // 26: openpak.leaderboards.v1.ListBoardsRequest
-	(*ListBoardsResponse)(nil), // 27: openpak.leaderboards.v1.ListBoardsResponse
-	(*TitleName)(nil),          // 28: openpak.leaderboards.v1.TitleName
-	nil,                        // 29: openpak.leaderboards.v1.Policy.ColumnAggregationsEntry
-	nil,                        // 30: openpak.leaderboards.v1.Entry.ColumnsEntry
-	nil,                        // 31: openpak.leaderboards.v1.SubmitRequest.ColumnsEntry
+	(*GroupsFilter)(nil),       // 4: openpak.leaderboards.v1.GroupsFilter
+	(*BoardRef)(nil),           // 5: openpak.leaderboards.v1.BoardRef
+	(*SubmitRequest)(nil),      // 6: openpak.leaderboards.v1.SubmitRequest
+	(*SubmitResponse)(nil),     // 7: openpak.leaderboards.v1.SubmitResponse
+	(*RangeRequest)(nil),       // 8: openpak.leaderboards.v1.RangeRequest
+	(*RangeResponse)(nil),      // 9: openpak.leaderboards.v1.RangeResponse
+	(*ByAccountsRequest)(nil),  // 10: openpak.leaderboards.v1.ByAccountsRequest
+	(*FriendRanksRequest)(nil), // 11: openpak.leaderboards.v1.FriendRanksRequest
+	(*BoardInfoRequest)(nil),   // 12: openpak.leaderboards.v1.BoardInfoRequest
+	(*BoardInfoResponse)(nil),  // 13: openpak.leaderboards.v1.BoardInfoResponse
+	(*TotalRequest)(nil),       // 14: openpak.leaderboards.v1.TotalRequest
+	(*TotalResponse)(nil),      // 15: openpak.leaderboards.v1.TotalResponse
+	(*SetDataRequest)(nil),     // 16: openpak.leaderboards.v1.SetDataRequest
+	(*SetDataResponse)(nil),    // 17: openpak.leaderboards.v1.SetDataResponse
+	(*GetDataRequest)(nil),     // 18: openpak.leaderboards.v1.GetDataRequest
+	(*GetDataResponse)(nil),    // 19: openpak.leaderboards.v1.GetDataResponse
+	(*DeleteRequest)(nil),      // 20: openpak.leaderboards.v1.DeleteRequest
+	(*DeleteResponse)(nil),     // 21: openpak.leaderboards.v1.DeleteResponse
+	(*UpsertBoardRequest)(nil), // 22: openpak.leaderboards.v1.UpsertBoardRequest
+	(*MapTitleRequest)(nil),    // 23: openpak.leaderboards.v1.MapTitleRequest
+	(*MapTitleResponse)(nil),   // 24: openpak.leaderboards.v1.MapTitleResponse
+	(*ResetBoardRequest)(nil),  // 25: openpak.leaderboards.v1.ResetBoardRequest
+	(*ResetBoardResponse)(nil), // 26: openpak.leaderboards.v1.ResetBoardResponse
+	(*ListBoardsRequest)(nil),  // 27: openpak.leaderboards.v1.ListBoardsRequest
+	(*ListBoardsResponse)(nil), // 28: openpak.leaderboards.v1.ListBoardsResponse
+	(*TitleName)(nil),          // 29: openpak.leaderboards.v1.TitleName
+	nil,                        // 30: openpak.leaderboards.v1.Policy.ColumnAggregationsEntry
+	nil,                        // 31: openpak.leaderboards.v1.Entry.ColumnsEntry
+	nil,                        // 32: openpak.leaderboards.v1.SubmitRequest.ColumnsEntry
 }
 var file_openpak_leaderboards_v1_leaderboards_proto_depIdxs = []int32{
-	29, // 0: openpak.leaderboards.v1.Policy.column_aggregations:type_name -> openpak.leaderboards.v1.Policy.ColumnAggregationsEntry
+	30, // 0: openpak.leaderboards.v1.Policy.column_aggregations:type_name -> openpak.leaderboards.v1.Policy.ColumnAggregationsEntry
 	0,  // 1: openpak.leaderboards.v1.Policy.cross_network:type_name -> openpak.leaderboards.v1.Tristate
 	1,  // 2: openpak.leaderboards.v1.Board.policy:type_name -> openpak.leaderboards.v1.Policy
-	30, // 3: openpak.leaderboards.v1.Entry.columns:type_name -> openpak.leaderboards.v1.Entry.ColumnsEntry
-	4,  // 4: openpak.leaderboards.v1.SubmitRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	31, // 5: openpak.leaderboards.v1.SubmitRequest.columns:type_name -> openpak.leaderboards.v1.SubmitRequest.ColumnsEntry
+	31, // 3: openpak.leaderboards.v1.Entry.columns:type_name -> openpak.leaderboards.v1.Entry.ColumnsEntry
+	5,  // 4: openpak.leaderboards.v1.SubmitRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	32, // 5: openpak.leaderboards.v1.SubmitRequest.columns:type_name -> openpak.leaderboards.v1.SubmitRequest.ColumnsEntry
 	1,  // 6: openpak.leaderboards.v1.SubmitRequest.create_policy:type_name -> openpak.leaderboards.v1.Policy
 	3,  // 7: openpak.leaderboards.v1.SubmitResponse.entry:type_name -> openpak.leaderboards.v1.Entry
-	4,  // 8: openpak.leaderboards.v1.RangeRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	3,  // 9: openpak.leaderboards.v1.RangeResponse.entries:type_name -> openpak.leaderboards.v1.Entry
-	4,  // 10: openpak.leaderboards.v1.ByAccountsRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	4,  // 11: openpak.leaderboards.v1.FriendRanksRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	4,  // 12: openpak.leaderboards.v1.BoardInfoRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	2,  // 13: openpak.leaderboards.v1.BoardInfoResponse.board:type_name -> openpak.leaderboards.v1.Board
-	4,  // 14: openpak.leaderboards.v1.TotalRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	4,  // 15: openpak.leaderboards.v1.SetDataRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	4,  // 16: openpak.leaderboards.v1.GetDataRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	4,  // 17: openpak.leaderboards.v1.DeleteRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	4,  // 18: openpak.leaderboards.v1.UpsertBoardRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	1,  // 19: openpak.leaderboards.v1.UpsertBoardRequest.policy:type_name -> openpak.leaderboards.v1.Policy
-	4,  // 20: openpak.leaderboards.v1.ResetBoardRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
-	2,  // 21: openpak.leaderboards.v1.ListBoardsResponse.boards:type_name -> openpak.leaderboards.v1.Board
-	28, // 22: openpak.leaderboards.v1.ListBoardsResponse.titles:type_name -> openpak.leaderboards.v1.TitleName
-	5,  // 23: openpak.leaderboards.v1.Leaderboards.Submit:input_type -> openpak.leaderboards.v1.SubmitRequest
-	7,  // 24: openpak.leaderboards.v1.Leaderboards.Range:input_type -> openpak.leaderboards.v1.RangeRequest
-	9,  // 25: openpak.leaderboards.v1.Leaderboards.ByAccounts:input_type -> openpak.leaderboards.v1.ByAccountsRequest
-	10, // 26: openpak.leaderboards.v1.Leaderboards.FriendRanks:input_type -> openpak.leaderboards.v1.FriendRanksRequest
-	11, // 27: openpak.leaderboards.v1.Leaderboards.BoardInfo:input_type -> openpak.leaderboards.v1.BoardInfoRequest
-	13, // 28: openpak.leaderboards.v1.Leaderboards.Total:input_type -> openpak.leaderboards.v1.TotalRequest
-	15, // 29: openpak.leaderboards.v1.Leaderboards.SetData:input_type -> openpak.leaderboards.v1.SetDataRequest
-	17, // 30: openpak.leaderboards.v1.Leaderboards.GetData:input_type -> openpak.leaderboards.v1.GetDataRequest
-	19, // 31: openpak.leaderboards.v1.Leaderboards.Delete:input_type -> openpak.leaderboards.v1.DeleteRequest
-	21, // 32: openpak.leaderboards.v1.Leaderboards.UpsertBoard:input_type -> openpak.leaderboards.v1.UpsertBoardRequest
-	22, // 33: openpak.leaderboards.v1.Leaderboards.MapTitle:input_type -> openpak.leaderboards.v1.MapTitleRequest
-	24, // 34: openpak.leaderboards.v1.Leaderboards.ResetBoard:input_type -> openpak.leaderboards.v1.ResetBoardRequest
-	26, // 35: openpak.leaderboards.v1.Leaderboards.ListBoards:input_type -> openpak.leaderboards.v1.ListBoardsRequest
-	6,  // 36: openpak.leaderboards.v1.Leaderboards.Submit:output_type -> openpak.leaderboards.v1.SubmitResponse
-	8,  // 37: openpak.leaderboards.v1.Leaderboards.Range:output_type -> openpak.leaderboards.v1.RangeResponse
-	8,  // 38: openpak.leaderboards.v1.Leaderboards.ByAccounts:output_type -> openpak.leaderboards.v1.RangeResponse
-	8,  // 39: openpak.leaderboards.v1.Leaderboards.FriendRanks:output_type -> openpak.leaderboards.v1.RangeResponse
-	12, // 40: openpak.leaderboards.v1.Leaderboards.BoardInfo:output_type -> openpak.leaderboards.v1.BoardInfoResponse
-	14, // 41: openpak.leaderboards.v1.Leaderboards.Total:output_type -> openpak.leaderboards.v1.TotalResponse
-	16, // 42: openpak.leaderboards.v1.Leaderboards.SetData:output_type -> openpak.leaderboards.v1.SetDataResponse
-	18, // 43: openpak.leaderboards.v1.Leaderboards.GetData:output_type -> openpak.leaderboards.v1.GetDataResponse
-	20, // 44: openpak.leaderboards.v1.Leaderboards.Delete:output_type -> openpak.leaderboards.v1.DeleteResponse
-	12, // 45: openpak.leaderboards.v1.Leaderboards.UpsertBoard:output_type -> openpak.leaderboards.v1.BoardInfoResponse
-	23, // 46: openpak.leaderboards.v1.Leaderboards.MapTitle:output_type -> openpak.leaderboards.v1.MapTitleResponse
-	25, // 47: openpak.leaderboards.v1.Leaderboards.ResetBoard:output_type -> openpak.leaderboards.v1.ResetBoardResponse
-	27, // 48: openpak.leaderboards.v1.Leaderboards.ListBoards:output_type -> openpak.leaderboards.v1.ListBoardsResponse
-	36, // [36:49] is the sub-list for method output_type
-	23, // [23:36] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	5,  // 8: openpak.leaderboards.v1.RangeRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	4,  // 9: openpak.leaderboards.v1.RangeRequest.groups_filter:type_name -> openpak.leaderboards.v1.GroupsFilter
+	3,  // 10: openpak.leaderboards.v1.RangeResponse.entries:type_name -> openpak.leaderboards.v1.Entry
+	5,  // 11: openpak.leaderboards.v1.ByAccountsRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	4,  // 12: openpak.leaderboards.v1.ByAccountsRequest.groups_filter:type_name -> openpak.leaderboards.v1.GroupsFilter
+	5,  // 13: openpak.leaderboards.v1.FriendRanksRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	4,  // 14: openpak.leaderboards.v1.FriendRanksRequest.groups_filter:type_name -> openpak.leaderboards.v1.GroupsFilter
+	5,  // 15: openpak.leaderboards.v1.BoardInfoRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	2,  // 16: openpak.leaderboards.v1.BoardInfoResponse.board:type_name -> openpak.leaderboards.v1.Board
+	5,  // 17: openpak.leaderboards.v1.TotalRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	4,  // 18: openpak.leaderboards.v1.TotalRequest.groups_filter:type_name -> openpak.leaderboards.v1.GroupsFilter
+	5,  // 19: openpak.leaderboards.v1.SetDataRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	5,  // 20: openpak.leaderboards.v1.GetDataRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	5,  // 21: openpak.leaderboards.v1.DeleteRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	5,  // 22: openpak.leaderboards.v1.UpsertBoardRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	1,  // 23: openpak.leaderboards.v1.UpsertBoardRequest.policy:type_name -> openpak.leaderboards.v1.Policy
+	5,  // 24: openpak.leaderboards.v1.ResetBoardRequest.ref:type_name -> openpak.leaderboards.v1.BoardRef
+	2,  // 25: openpak.leaderboards.v1.ListBoardsResponse.boards:type_name -> openpak.leaderboards.v1.Board
+	29, // 26: openpak.leaderboards.v1.ListBoardsResponse.titles:type_name -> openpak.leaderboards.v1.TitleName
+	6,  // 27: openpak.leaderboards.v1.Leaderboards.Submit:input_type -> openpak.leaderboards.v1.SubmitRequest
+	8,  // 28: openpak.leaderboards.v1.Leaderboards.Range:input_type -> openpak.leaderboards.v1.RangeRequest
+	10, // 29: openpak.leaderboards.v1.Leaderboards.ByAccounts:input_type -> openpak.leaderboards.v1.ByAccountsRequest
+	11, // 30: openpak.leaderboards.v1.Leaderboards.FriendRanks:input_type -> openpak.leaderboards.v1.FriendRanksRequest
+	12, // 31: openpak.leaderboards.v1.Leaderboards.BoardInfo:input_type -> openpak.leaderboards.v1.BoardInfoRequest
+	14, // 32: openpak.leaderboards.v1.Leaderboards.Total:input_type -> openpak.leaderboards.v1.TotalRequest
+	16, // 33: openpak.leaderboards.v1.Leaderboards.SetData:input_type -> openpak.leaderboards.v1.SetDataRequest
+	18, // 34: openpak.leaderboards.v1.Leaderboards.GetData:input_type -> openpak.leaderboards.v1.GetDataRequest
+	20, // 35: openpak.leaderboards.v1.Leaderboards.Delete:input_type -> openpak.leaderboards.v1.DeleteRequest
+	22, // 36: openpak.leaderboards.v1.Leaderboards.UpsertBoard:input_type -> openpak.leaderboards.v1.UpsertBoardRequest
+	23, // 37: openpak.leaderboards.v1.Leaderboards.MapTitle:input_type -> openpak.leaderboards.v1.MapTitleRequest
+	25, // 38: openpak.leaderboards.v1.Leaderboards.ResetBoard:input_type -> openpak.leaderboards.v1.ResetBoardRequest
+	27, // 39: openpak.leaderboards.v1.Leaderboards.ListBoards:input_type -> openpak.leaderboards.v1.ListBoardsRequest
+	7,  // 40: openpak.leaderboards.v1.Leaderboards.Submit:output_type -> openpak.leaderboards.v1.SubmitResponse
+	9,  // 41: openpak.leaderboards.v1.Leaderboards.Range:output_type -> openpak.leaderboards.v1.RangeResponse
+	9,  // 42: openpak.leaderboards.v1.Leaderboards.ByAccounts:output_type -> openpak.leaderboards.v1.RangeResponse
+	9,  // 43: openpak.leaderboards.v1.Leaderboards.FriendRanks:output_type -> openpak.leaderboards.v1.RangeResponse
+	13, // 44: openpak.leaderboards.v1.Leaderboards.BoardInfo:output_type -> openpak.leaderboards.v1.BoardInfoResponse
+	15, // 45: openpak.leaderboards.v1.Leaderboards.Total:output_type -> openpak.leaderboards.v1.TotalResponse
+	17, // 46: openpak.leaderboards.v1.Leaderboards.SetData:output_type -> openpak.leaderboards.v1.SetDataResponse
+	19, // 47: openpak.leaderboards.v1.Leaderboards.GetData:output_type -> openpak.leaderboards.v1.GetDataResponse
+	21, // 48: openpak.leaderboards.v1.Leaderboards.Delete:output_type -> openpak.leaderboards.v1.DeleteResponse
+	13, // 49: openpak.leaderboards.v1.Leaderboards.UpsertBoard:output_type -> openpak.leaderboards.v1.BoardInfoResponse
+	24, // 50: openpak.leaderboards.v1.Leaderboards.MapTitle:output_type -> openpak.leaderboards.v1.MapTitleResponse
+	26, // 51: openpak.leaderboards.v1.Leaderboards.ResetBoard:output_type -> openpak.leaderboards.v1.ResetBoardResponse
+	28, // 52: openpak.leaderboards.v1.Leaderboards.ListBoards:output_type -> openpak.leaderboards.v1.ListBoardsResponse
+	40, // [40:53] is the sub-list for method output_type
+	27, // [27:40] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_openpak_leaderboards_v1_leaderboards_proto_init() }
@@ -2115,7 +2247,7 @@ func file_openpak_leaderboards_v1_leaderboards_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_openpak_leaderboards_v1_leaderboards_proto_rawDesc), len(file_openpak_leaderboards_v1_leaderboards_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   31,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

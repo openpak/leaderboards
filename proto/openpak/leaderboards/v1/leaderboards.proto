@@ -82,6 +82,14 @@ message Entry {
   int64  updated_unix_ms = 10;
   int64  rank         = 11; // competition rank: ties share it
   int64  position     = 12; // unique 1-based position
+  bytes  groups       = 13; // optional; set by SubmitRequest.groups
+}
+
+// GroupsFilter keeps entries whose groups byte at group_index equals group_value (an entry with
+// no such byte never matches). Ranks, positions and totals are among the matching entries.
+message GroupsFilter {
+  int32  group_index = 1; // 0-based; negative = no filter
+  uint32 group_value = 2; // 0..255 can match
 }
 
 message BoardRef {
@@ -101,6 +109,12 @@ message SubmitRequest {
   string display_name = 8;
   // Used only to create the board when it does not exist yet.
   Policy create_policy = 9;
+  // Optional per-entry group bytes (NEX ranking groups). Score-bound like info: stored with the
+  // score, replaced whenever the score is replaced. Filterable with GroupsFilter.
+  bytes groups = 10;
+  // Optional "latest" (alias "force"): this call replaces the stored entry whatever the board's
+  // aggregation (NEX UpdateModeDeleteOld, in one atomic call). Any other value is invalid.
+  string aggregation_override = 11;
 }
 
 message SubmitResponse {
@@ -115,6 +129,7 @@ message RangeRequest {
   BoardRef ref = 1;
   int64 start  = 2; // 1-based position
   int64 limit  = 3; // default 25, max 100
+  GroupsFilter groups_filter = 4;
 }
 
 message RangeResponse {
@@ -126,6 +141,7 @@ message RangeResponse {
 message ByAccountsRequest {
   BoardRef ref = 1;
   repeated string accounts = 2;
+  GroupsFilter groups_filter = 3;
 }
 
 message FriendRanksRequest {
@@ -134,11 +150,12 @@ message FriendRanksRequest {
   bool include_self = 3;
   int64 offset = 4;
   int64 limit  = 5;
+  GroupsFilter groups_filter = 6;
 }
 
 message BoardInfoRequest { BoardRef ref = 1; }
 message BoardInfoResponse { Board board = 1; }
-message TotalRequest { BoardRef ref = 1; }
+message TotalRequest { BoardRef ref = 1; GroupsFilter groups_filter = 2; }
 message TotalResponse { int64 total = 1; }
 
 message SetDataRequest {

@@ -21,6 +21,7 @@ const (
 	MaxComment = 512
 	MaxInfo    = 4096
 	MaxColumns = 64
+	MaxGroups  = 256
 	DefaultN   = 25
 	MaxN       = 100
 )
@@ -96,14 +97,14 @@ func clamp(n, def int64) int64 {
 }
 
 // Submit applies the board's aggregation. A board that does not exist is created from policy.
-func (s *Service) Submit(ctx context.Context, r Ref, account string, sub int, score int64, cols map[string]int64, comment string, info []byte, display string, policy store.Policy) (store.Board, store.SubmitResult, int64, error) {
+func (s *Service) Submit(ctx context.Context, r Ref, account string, sub int, score int64, cols map[string]int64, comment string, info []byte, display string, policy store.Policy, opt store.SubmitOpts) (store.Board, store.SubmitResult, int64, error) {
 	if err := validAccount(account); err != nil {
 		return store.Board{}, store.SubmitResult{}, 0, err
 	}
 	if r.Network == "" {
 		return store.Board{}, store.SubmitResult{}, 0, ErrBadRequest
 	}
-	if len(comment) > MaxComment || len(info) > MaxInfo || len(cols) > MaxColumns {
+	if len(comment) > MaxComment || len(info) > MaxInfo || len(opt.Groups) > MaxGroups || len(cols) > MaxColumns {
 		return store.Board{}, store.SubmitResult{}, 0, ErrTooLarge
 	}
 	title, err := s.Store.ResolveTitle(ctx, r.Network, r.Title, true)
@@ -114,14 +115,14 @@ func (s *Service) Submit(ctx context.Context, r Ref, account string, sub int, sc
 	if err != nil {
 		return b, store.SubmitResult{}, 0, err
 	}
-	res, err := s.Store.Submit(ctx, b, r.Network, account, sub, score, cols, comment, info, display)
+	res, err := s.Store.Submit(ctx, b, r.Network, account, sub, score, cols, comment, info, display, opt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = nil // per-network board and the entry belongs to another network: unranked
 	}
 	if err != nil {
 		return b, res, 0, err
 	}
-	total, _ := s.Store.Total(ctx, b, r.Network)
+	total, _ := s.Store.Total(ctx, b, r.Network, nil)
 	if res.Changed && res.Improved {
 		s.announce(ctx, b, account, res)
 	}
@@ -146,7 +147,7 @@ func (s *Service) announce(ctx context.Context, b store.Board, account string, r
 	}
 }
 
-func (s *Service) Range(ctx context.Context, r Ref, start, limit int64) (store.Board, []store.Entry, int64, error) {
+func (s *Service) Range(ctx context.Context, r Ref, start, limit int64, g *store.Group) (store.Board, []store.Entry, int64, error) {
 	b, err := s.readBoard(ctx, r)
 	if errors.Is(err, errNoTitleEmpty) {
 		return b, nil, 0, nil
@@ -155,15 +156,15 @@ func (s *Service) Range(ctx context.Context, r Ref, start, limit int64) (store.B
 		return b, nil, 0, err
 	}
 	n := clamp(limit, DefaultN)
-	es, err := s.Store.Range(ctx, b, r.Network, max(start, 1), n)
+	es, err := s.Store.Range(ctx, b, r.Network, max(start, 1), n, g)
 	if err != nil {
 		return b, nil, 0, err
 	}
-	total, err := s.Store.Total(ctx, b, r.Network)
+	total, err := s.Store.Total(ctx, b, r.Network, g)
 	return b, es, total, err
 }
 
-func (s *Service) ByAccounts(ctx context.Context, r Ref, accounts []string) (store.Board, []store.Entry, int64, error) {
+func (s *Service) ByAccounts(ctx context.Context, r Ref, accounts []string, g *store.Group) (store.Board, []store.Entry, int64, error) {
 	for _, a := range accounts {
 		if err := validAccount(a); err != nil {
 			return store.Board{}, nil, 0, err
@@ -179,17 +180,17 @@ func (s *Service) ByAccounts(ctx context.Context, r Ref, accounts []string) (sto
 	if len(accounts) == 0 {
 		return b, nil, 0, nil
 	}
-	es, err := s.Store.Accounts(ctx, b, r.Network, accounts)
+	es, err := s.Store.Accounts(ctx, b, r.Network, accounts, g)
 	if err != nil {
 		return b, nil, 0, err
 	}
-	total, err := s.Store.Total(ctx, b, r.Network)
+	total, err := s.Store.Total(ctx, b, r.Network, g)
 	return b, es, total, err
 }
 
 // FriendRanks is the best entry of each friend (and optionally the caller) in rank order, ranks
 // global. The friend list is the account core's, so the rule is the same for every network.
-func (s *Service) FriendRanks(ctx context.Context, r Ref, account string, includeSelf bool, offset, limit int64) (store.Board, []store.Entry, int64, int64, error) {
+func (s *Service) FriendRanks(ctx context.Context, r Ref, account string, includeSelf bool, offset, limit int64, g *store.Group) (store.Board, []store.Entry, int64, int64, error) {
 	if err := validAccount(account); err != nil {
 		return store.Board{}, nil, 0, 0, err
 	}
@@ -200,7 +201,7 @@ func (s *Service) FriendRanks(ctx context.Context, r Ref, account string, includ
 	if includeSelf {
 		friends = append(friends, account)
 	}
-	b, es, total, err := s.ByAccounts(ctx, r, friends)
+	b, es, total, err := s.ByAccounts(ctx, r, friends, g)
 	if err != nil {
 		return b, nil, 0, 0, err
 	}
@@ -227,7 +228,7 @@ func (s *Service) BoardInfo(ctx context.Context, r Ref) (store.Board, error) {
 	return b, err
 }
 
-func (s *Service) Total(ctx context.Context, r Ref) (int64, error) {
+func (s *Service) Total(ctx context.Context, r Ref, g *store.Group) (int64, error) {
 	b, err := s.readBoard(ctx, r)
 	if errors.Is(err, errNoTitleEmpty) {
 		return 0, nil
@@ -235,7 +236,7 @@ func (s *Service) Total(ctx context.Context, r Ref) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return s.Store.Total(ctx, b, r.Network)
+	return s.Store.Total(ctx, b, r.Network, g)
 }
 
 // SetData stores game data on the entry whose score is exactly expect.

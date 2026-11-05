@@ -2,6 +2,14 @@
 
 `git log` stays the source of truth; this file is the readable summary.
 
+## v0.3.0 — 2026-11-05
+- Additive, for the NEX adapter (card #131, gaps L1-L3); existing clients are unchanged.
+- L1: `groups` bytes on `SubmitRequest`/`Entry` (new `entries.groups` column, added at start with `ADD COLUMN IF NOT EXISTS`) and an optional
+  `groups_filter {group_index, group_value}` on `Range`, `Total`, `ByAccounts` and `FriendRanks`; ranks/positions/totals are among matching entries.
+- L2: no change. `(account, sub)` with an int32 `sub` already allows several entries per account; NEX keeps one per player per category (the meaning of UpdateModeNormal).
+- L3: `SubmitRequest.aggregation_override` (`latest`/`force`) replaces the entry in one atomic call; the board policy is untouched.
+- Tests: filter on every read, score-bound groups, override, and erasure covering the groups column.
+
 ## v0.2.3 — 2026-11-04
 - `GET .../internal/rankings/boards?all=1` also lists boards with no entries yet (default unchanged), for the website's every-game rankings hub.
 

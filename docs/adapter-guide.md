@@ -44,8 +44,10 @@ wire (codecs, ids, signatures, paging shape) and the core keeps the data. Refere
   `network = "wiiu"` (3DS: `3ds` shares the PID namespace, pick one and keep it).
 * `UploadScore` with a per-category update mode: "all" is `latest`/`force`, "best" is `best`;
   declare it per category with `UpsertBoard`. Ascending (time) categories are `order: "asc"`.
-* The ranking `param` and group values go into `columns` (`"param"`, `"g0"`, ...); common data and
-  ghosts use `SetData`/`GetData` with `sub` 0. Ordinal ranking (1,2,3 with no ties) is `position`,
+* The ranking `param` goes into `columns` or `info`; the NEX group bytes go into `groups` on
+  `Submit` and are read back with `groups_filter` (no adapter-side filtering). `UpdateModeDeleteOld`
+  is `Submit` with `aggregation_override: "latest"`. One score per player per category (sub 0);
+  common data and ghosts use `SetData`/`GetData` with `sub` 0. Ordinal ranking (1,2,3 with no ties) is `position`,
   standard ranking is `rank`.
 * Mario Kart 8 on Wii U and Switch: use the same neutral title key for both and keep
   `cross_network` true to share one board; set it false for a per-network season.

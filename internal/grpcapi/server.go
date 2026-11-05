@@ -63,6 +63,14 @@ func policy(p *pb.Policy) store.Policy {
 		RankLimit: int(p.GetRankLimit()), DataLimit: int(p.GetDataLimit()), SizeLimit: int(p.GetSizeLimit()), Cross: tri(p.GetCrossNetwork())}
 }
 
+// group maps the optional wire filter; a negative index is rejected by the caller as no filter.
+func group(g *pb.GroupsFilter) *store.Group {
+	if g == nil || g.GetGroupIndex() < 0 {
+		return nil
+	}
+	return &store.Group{Index: int(g.GetGroupIndex()), Value: int(min(g.GetGroupValue(), 1<<20))}
+}
+
 func pbBoard(b store.Board) *pb.Board {
 	cross := pb.Tristate_TRISTATE_FALSE
 	if b.Cross {
@@ -75,7 +83,7 @@ func pbBoard(b store.Board) *pb.Board {
 }
 
 func pbEntry(e store.Entry) *pb.Entry {
-	return &pb.Entry{Account: e.Account, Sub: int32(e.Sub), Score: e.Score, Columns: e.Columns, Comment: e.Comment, Info: e.Info,
+	return &pb.Entry{Account: e.Account, Sub: int32(e.Sub), Score: e.Score, Columns: e.Columns, Comment: e.Comment, Info: e.Info, Groups: e.Groups,
 		HasData: e.HasData, Network: e.Network, DisplayName: e.DisplayName, UpdatedUnixMs: e.Updated.UnixMilli(), Rank: e.Rank, Position: e.Position}
 }
 
@@ -92,7 +100,7 @@ func (s *Server) Submit(ctx context.Context, req *pb.SubmitRequest) (*pb.SubmitR
 		return nil, err
 	}
 	_, res, total, err := s.svc.Submit(ctx, ref(req.GetRef()), req.GetAccount(), int(req.GetSub()), req.GetScore(), req.GetColumns(),
-		req.GetComment(), req.GetInfo(), req.GetDisplayName(), policy(req.GetCreatePolicy()))
+		req.GetComment(), req.GetInfo(), req.GetDisplayName(), policy(req.GetCreatePolicy()), store.SubmitOpts{Groups: req.GetGroups(), AggOverride: req.GetAggregationOverride()})
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -103,7 +111,7 @@ func (s *Server) Range(ctx context.Context, req *pb.RangeRequest) (*pb.RangeResp
 	if err := s.authorize(ctx); err != nil {
 		return nil, err
 	}
-	_, es, total, err := s.svc.Range(ctx, ref(req.GetRef()), req.GetStart(), req.GetLimit())
+	_, es, total, err := s.svc.Range(ctx, ref(req.GetRef()), req.GetStart(), req.GetLimit(), group(req.GetGroupsFilter()))
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -114,7 +122,7 @@ func (s *Server) ByAccounts(ctx context.Context, req *pb.ByAccountsRequest) (*pb
 	if err := s.authorize(ctx); err != nil {
 		return nil, err
 	}
-	_, es, total, err := s.svc.ByAccounts(ctx, ref(req.GetRef()), req.GetAccounts())
+	_, es, total, err := s.svc.ByAccounts(ctx, ref(req.GetRef()), req.GetAccounts(), group(req.GetGroupsFilter()))
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -125,7 +133,7 @@ func (s *Server) FriendRanks(ctx context.Context, req *pb.FriendRanksRequest) (*
 	if err := s.authorize(ctx); err != nil {
 		return nil, err
 	}
-	_, es, total, hits, err := s.svc.FriendRanks(ctx, ref(req.GetRef()), req.GetAccount(), req.GetIncludeSelf(), req.GetOffset(), req.GetLimit())
+	_, es, total, hits, err := s.svc.FriendRanks(ctx, ref(req.GetRef()), req.GetAccount(), req.GetIncludeSelf(), req.GetOffset(), req.GetLimit(), group(req.GetGroupsFilter()))
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -147,7 +155,7 @@ func (s *Server) Total(ctx context.Context, req *pb.TotalRequest) (*pb.TotalResp
 	if err := s.authorize(ctx); err != nil {
 		return nil, err
 	}
-	n, err := s.svc.Total(ctx, ref(req.GetRef()))
+	n, err := s.svc.Total(ctx, ref(req.GetRef()), group(req.GetGroupsFilter()))
 	if err != nil {
 		return nil, mapErr(err)
 	}

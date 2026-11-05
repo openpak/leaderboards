@@ -69,6 +69,7 @@ type Entry struct {
 	Columns     map[string]int64
 	Comment     string
 	Info        []byte
+	Groups      []byte // optional per-entry group bytes (NEX ranking groups); filterable
 	HasData     bool
 	Network     string
 	DisplayName string
@@ -77,7 +78,24 @@ type Entry struct {
 	Position    int64 // unique 1-based position
 }
 
+// Group filters a read to entries whose Groups byte at Index equals Value. Entries with no such
+// byte (shorter or empty groups) never match; a Value above 255 matches nothing. nil = no filter.
+type Group struct{ Index, Value int }
+
+// SubmitOpts are the optional parts of a Submit.
+type SubmitOpts struct {
+	Groups      []byte // stored with the score (score-bound, like info)
+	AggOverride string // "latest": this call replaces the stored entry whatever the board aggregation
+}
+
 type Store struct{ DB *pgxpool.Pool }
+
+func (g *Group) args() (int, int) {
+	if g == nil {
+		return -1, 0
+	}
+	return g.Index, g.Value
+}
 
 const schema = `
 CREATE TABLE IF NOT EXISTS titles (
@@ -117,12 +135,14 @@ CREATE TABLE IF NOT EXISTS entries (
     columns      JSONB NOT NULL DEFAULT '{}',
     comment      TEXT NOT NULL DEFAULT '',
     info         BYTEA NOT NULL DEFAULT ''::bytea,
+    groups       BYTEA NOT NULL DEFAULT ''::bytea,
     data         BYTEA,
     network      TEXT NOT NULL,
     display_name TEXT NOT NULL DEFAULT '',
     updated      TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (title_key, board_id, account, sub)
 );
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS groups BYTEA NOT NULL DEFAULT ''::bytea;
 CREATE INDEX IF NOT EXISTS entries_rank ON entries (title_key, board_id, score);
 CREATE INDEX IF NOT EXISTS entries_account ON entries (account);
 
@@ -382,9 +402,11 @@ func dir(asc bool) string {
 
 func ranked(asc bool) string {
 	d := dir(asc)
-	return `WITH r AS (SELECT account::text, sub, score, columns, comment, info, data IS NOT NULL AS has_data, network, display_name, updated,
+	// $4/$5 are the groups filter (index -1 = none). Ranks and positions are among the filtered rows.
+	return `WITH r AS (SELECT account::text, sub, score, columns, comment, info, groups, data IS NOT NULL AS has_data, network, display_name, updated,
 		rank() OVER (ORDER BY score ` + d + `) AS rnk, row_number() OVER (ORDER BY score ` + d + `, updated, account, sub) AS pos
-		FROM entries WHERE title_key = $1 AND board_id = $2 AND ($3 = '' OR network = $3)) SELECT * FROM r `
+		FROM entries WHERE title_key = $1 AND board_id = $2 AND ($3 = '' OR network = $3)
+		AND (CASE WHEN $4 < 0 THEN true WHEN length(groups) > $4 THEN get_byte(groups, $4) = $5 ELSE false END)) SELECT * FROM r `
 }
 
 func scanEntries(rows pgx.Rows) ([]Entry, error) {
@@ -393,7 +415,7 @@ func scanEntries(rows pgx.Rows) ([]Entry, error) {
 	for rows.Next() {
 		var e Entry
 		var cols []byte
-		if err := rows.Scan(&e.Account, &e.Sub, &e.Score, &cols, &e.Comment, &e.Info, &e.HasData, &e.Network, &e.DisplayName, &e.Updated, &e.Rank, &e.Position); err != nil {
+		if err := rows.Scan(&e.Account, &e.Sub, &e.Score, &cols, &e.Comment, &e.Info, &e.Groups, &e.HasData, &e.Network, &e.DisplayName, &e.Updated, &e.Rank, &e.Position); err != nil {
 			return nil, err
 		}
 		e.Columns = map[string]int64{}
@@ -405,16 +427,19 @@ func scanEntries(rows pgx.Rows) ([]Entry, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) Total(ctx context.Context, b Board, network string) (int64, error) {
+func (s *Store) Total(ctx context.Context, b Board, network string, g *Group) (int64, error) {
 	var n int64
-	err := s.DB.QueryRow(ctx, `SELECT count(*) FROM entries WHERE title_key = $1 AND board_id = $2 AND ($3 = '' OR network = $3)`,
-		b.Title, b.ID, netFilter(b, network)).Scan(&n)
+	gi, gv := g.args()
+	err := s.DB.QueryRow(ctx, `SELECT count(*) FROM entries WHERE title_key = $1 AND board_id = $2 AND ($3 = '' OR network = $3)
+		AND (CASE WHEN $4 < 0 THEN true WHEN length(groups) > $4 THEN get_byte(groups, $4) = $5 ELSE false END)`,
+		b.Title, b.ID, netFilter(b, network), gi, gv).Scan(&n)
 	return n, err
 }
 
 // Range returns up to n entries from 1-based position start.
-func (s *Store) Range(ctx context.Context, b Board, network string, start, n int64) ([]Entry, error) {
-	rows, err := s.DB.Query(ctx, ranked(b.Asc())+`WHERE pos >= $4 ORDER BY pos LIMIT $5`, b.Title, b.ID, netFilter(b, network), start, n)
+func (s *Store) Range(ctx context.Context, b Board, network string, start, n int64, g *Group) ([]Entry, error) {
+	gi, gv := g.args()
+	rows, err := s.DB.Query(ctx, ranked(b.Asc())+`WHERE pos >= $6 ORDER BY pos LIMIT $7`, b.Title, b.ID, netFilter(b, network), gi, gv, start, n)
 	if err != nil {
 		return nil, err
 	}
@@ -422,8 +447,9 @@ func (s *Store) Range(ctx context.Context, b Board, network string, start, n int
 }
 
 // Accounts returns every entry of the given accounts, best first.
-func (s *Store) Accounts(ctx context.Context, b Board, network string, accounts []string) ([]Entry, error) {
-	rows, err := s.DB.Query(ctx, ranked(b.Asc())+`WHERE account = ANY($4::text[]) ORDER BY pos`, b.Title, b.ID, netFilter(b, network), accounts)
+func (s *Store) Accounts(ctx context.Context, b Board, network string, accounts []string, g *Group) ([]Entry, error) {
+	gi, gv := g.args()
+	rows, err := s.DB.Query(ctx, ranked(b.Asc())+`WHERE account = ANY($6::text[]) ORDER BY pos`, b.Title, b.ID, netFilter(b, network), gi, gv, accounts)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +497,14 @@ func sameColumns(a, b map[string]int64) bool {
 }
 
 // Submit applies the board's aggregation to (account, sub) atomically.
-func (s *Store) Submit(ctx context.Context, b Board, network, account string, sub int, score int64, cols map[string]int64, comment string, info []byte, display string) (SubmitResult, error) {
+func (s *Store) Submit(ctx context.Context, b Board, network, account string, sub int, score int64, cols map[string]int64, comment string, info []byte, display string, opt SubmitOpts) (SubmitResult, error) {
+	if opt.AggOverride != "" {
+		agg, err := normAgg(opt.AggOverride)
+		if err != nil || agg != AggLatest {
+			return SubmitResult{}, ErrBadPolicy // only "latest" (alias "force") may be forced per call
+		}
+		b.Aggregation = AggLatest
+	}
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		return SubmitResult{}, err
@@ -538,10 +571,14 @@ func (s *Store) Submit(ctx context.Context, b Board, network, account string, su
 		if info == nil {
 			info = []byte{}
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO entries (title_key, board_id, account, sub, score, columns, comment, info, data, network, display_name, updated)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL,$9,$10,now())
-			ON CONFLICT (title_key, board_id, account, sub) DO UPDATE SET score=$5, columns=$6, comment=$7, info=$8, data=NULL, network=$9, display_name=$10, updated=now()`,
-			b.Title, b.ID, account, sub, newScore, colsJSON, comment, info, network, display)
+		groups := opt.Groups
+		if groups == nil {
+			groups = []byte{}
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO entries (title_key, board_id, account, sub, score, columns, comment, info, groups, data, network, display_name, updated)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$11,NULL,$9,$10,now())
+			ON CONFLICT (title_key, board_id, account, sub) DO UPDATE SET score=$5, columns=$6, comment=$7, info=$8, groups=$11, data=NULL, network=$9, display_name=$10, updated=now()`,
+			b.Title, b.ID, account, sub, newScore, colsJSON, comment, info, network, display, groups)
 		res.Changed = true
 	case colsChanged:
 		colsJSON, _ := json.Marshal(merged)
@@ -560,7 +597,7 @@ func (s *Store) Submit(ctx context.Context, b Board, network, account string, su
 
 // One returns an entry with its place, ErrNoBoard-free: pgx.ErrNoRows when absent.
 func (s *Store) One(ctx context.Context, b Board, network, account string, sub int) (Entry, error) {
-	rows, err := s.DB.Query(ctx, ranked(b.Asc())+`WHERE account = $4 AND sub = $5`, b.Title, b.ID, netFilter(b, network), account, sub)
+	rows, err := s.DB.Query(ctx, ranked(b.Asc())+`WHERE account = $6 AND sub = $7`, b.Title, b.ID, netFilter(b, network), -1, 0, account, sub)
 	if err != nil {
 		return Entry{}, err
 	}
